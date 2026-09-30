@@ -1,0 +1,220 @@
+<div class="page">
+  <header class="page__header">
+    <div class="page__title">
+      <h1>Sales</h1>
+      <p class="page__subtitle">
+        Receipt history. Voiding a sale keeps the record and returns the stock.
+      </p>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="card__body toolbar">
+      <div class="field filter-grow">
+        <label class="field__label" for="sales-search">Search</label>
+        <input
+          id="sales-search"
+          class="input"
+          type="search"
+          placeholder="Receipt number, cashier or customer"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+          (keyup.enter)="applyFilters()"
+        />
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="sales-status">Status</label>
+        <select
+          id="sales-status"
+          class="select"
+          [ngModel]="status()"
+          (ngModelChange)="status.set($event); applyFilters()"
+        >
+          @for (option of statuses; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="sales-from">From</label>
+        <input
+          id="sales-from"
+          class="input"
+          type="date"
+          [ngModel]="from()"
+          (ngModelChange)="from.set($event)"
+        />
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="sales-to">To</label>
+        <input
+          id="sales-to"
+          class="input"
+          type="date"
+          [ngModel]="to()"
+          (ngModelChange)="to.set($event)"
+        />
+      </div>
+
+      <button type="button" class="btn btn--primary" (click)="applyFilters()">Apply</button>
+      <button type="button" class="btn btn--secondary" (click)="clearFilters()">Reset</button>
+    </div>
+
+    @if (loading()) {
+      <div class="card__body loading-row"><span class="spinner"></span> Loading sales…</div>
+    } @else if (page().content.length === 0) {
+      <p class="empty-state">No sales match these filters.</p>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Receipt</th>
+              <th scope="col">When</th>
+              <th scope="col">Cashier</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Payment</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="numeric">Total</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (sale of page().content; track sale.id) {
+              <tr [class.row--voided]="sale.status === 'VOIDED'">
+                <td><span class="reference">{{ sale.reference }}</span></td>
+                <td>
+                  <span class="cell__primary">{{ sale.soldAt | date: 'd MMM y' }}</span>
+                  <span class="cell__secondary">{{ sale.soldAt | date: 'HH:mm' }}</span>
+                </td>
+                <td>{{ sale.cashierName }}</td>
+                <td class="muted">{{ sale.customerName ?? 'Walk-in' }}</td>
+                <td>{{ paymentLabel(sale.paymentMethod) }}</td>
+                <td>
+                  <span class="badge {{ statusBadge(sale.status) }}">{{ sale.status }}</span>
+                </td>
+                <td class="numeric">{{ sale.total | money }}</td>
+                <td>
+                  <div class="table__actions">
+                    <button
+                      type="button"
+                      class="btn btn--secondary btn--sm"
+                      [disabled]="working()"
+                      (click)="openSale(sale)"
+                    >
+                      View
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span>
+          {{ rangeLabel() }} &middot;
+          <span class="page-total">completed on this page {{ pageTotal() | money }}</span>
+        </span>
+        <div class="pager__controls">
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="page().first"
+            (click)="goToPage(page().page - 1)"
+          >
+            Previous
+          </button>
+          <span>Page {{ page().page + 1 }} of {{ page().totalPages || 1 }}</span>
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="page().last"
+            (click)="goToPage(page().page + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- -------------------------------------------------------------- receipt view -->
+@if (selected(); as sale) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="sale-title">
+    <div class="modal modal--narrow">
+      <header class="modal__header">
+        <div>
+          <h2 id="sale-title">{{ sale.reference }}</h2>
+          <p class="muted">{{ sale.soldAt | date: 'medium' }}</p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="closeSale()" aria-label="Close">
+          &times;
+        </button>
+      </header>
+      <div class="modal__body">
+        <app-receipt [sale]="sale" />
+      </div>
+      <footer class="modal__footer">
+        @if (sale.status === 'COMPLETED') {
+          <button
+            type="button"
+            class="btn btn--danger-ghost"
+            [disabled]="working()"
+            (click)="askVoid(sale)"
+          >
+            Void sale
+          </button>
+        }
+        <button type="button" class="btn btn--secondary" (click)="printReceipt()">Print</button>
+        <button type="button" class="btn btn--primary" (click)="closeSale()">Close</button>
+      </footer>
+    </div>
+  </div>
+}
+
+<!-- --------------------------------------------------------------- void dialog -->
+@if (voidTarget(); as sale) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="void-title">
+    <div class="modal modal--narrow">
+      <header class="modal__header">
+        <h2 id="void-title">Void {{ sale.reference }}</h2>
+      </header>
+      <div class="modal__body">
+        <p>
+          This cancels a completed sale of <strong>{{ sale.total | money }}</strong> and puts
+          {{ sale.totalUnits }} {{ sale.totalUnits === 1 ? 'unit' : 'units' }} back into stock.
+        </p>
+        <p class="muted void-note">
+          The receipt number is kept and the sale stays in history, marked as voided.
+        </p>
+        <div class="field void-form">
+          <label class="field__label" for="void-reason">Reason (required)</label>
+          <input
+            id="void-reason"
+            class="input"
+            [ngModel]="voidReason()"
+            (ngModelChange)="voidReason.set($event)"
+            placeholder="e.g. wrong item scanned"
+          />
+        </div>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--secondary" (click)="cancelVoid()">Cancel</button>
+        <button
+          type="button"
+          class="btn btn--danger"
+          [disabled]="working() || !voidReason().trim()"
+          (click)="confirmVoid()"
+        >
+          {{ working() ? 'Voiding…' : 'Void sale' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}

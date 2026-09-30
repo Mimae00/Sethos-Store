@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# PostgreSQL profile. Matches the credentials in ../docker-compose.yml.
+#
+#   docker compose up -d
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+#
+# Every value can be overridden by an environment variable, which is how this
+# should be wired in a container or CI.
+# ---------------------------------------------------------------------------
+spring:
+  datasource:
+    url: ${POS_DB_URL:jdbc:postgresql://localhost:5432/posdb}
+    driver-class-name: org.postgresql.Driver
+    username: ${POS_DB_USERNAME:posuser}
+    password: ${POS_DB_PASSWORD:pospassword}
+    hikari:
+      pool-name: pos-pg-pool
+      maximum-pool-size: 20
+      minimum-idle: 2
+      connection-timeout: 10000
+
+  h2:
+    console:
+      enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+pos:
+  seed-demo-data: true

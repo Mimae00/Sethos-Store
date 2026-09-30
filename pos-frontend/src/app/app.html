@@ -1,0 +1,45 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true">{{ brandInitials() }}</span>
+      <span class="brand__text">
+        <span class="brand__name">{{ settings().storeName }}</span>
+        <span class="brand__meta">Point of Sale</span>
+      </span>
+    </div>
+
+    <nav class="nav" aria-label="Main navigation">
+      @for (item of navItems; track item.path) {
+        <a
+          class="nav__link"
+          [routerLink]="item.path"
+          routerLinkActive="nav__link--active"
+          [attr.title]="item.hint"
+        >
+          <span class="nav__label">{{ item.label }}</span>
+          @if (item.path === '/terminal' && basketCount() > 0) {
+            <span class="nav__badge" [attr.aria-label]="basketCount() + ' items in the basket'">
+              {{ basketCount() }}
+            </span>
+          }
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar__footer">
+      @if (apiOffline()) {
+        <p class="sidebar__warning" role="alert">
+          API unreachable. Start the backend on port 8080.
+        </p>
+      } @else {
+        <p class="sidebar__note">{{ settings().currencyCode }} &middot; {{ settings().timeZone }}</p>
+      }
+    </div>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
+
+<app-toast-host />

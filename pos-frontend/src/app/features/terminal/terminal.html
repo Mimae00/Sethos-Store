@@ -1,0 +1,356 @@
+<div class="terminal">
+  <!-- ---------------------------------------------------------------- catalogue -->
+  <section class="catalogue" aria-label="Product catalogue">
+    <div class="catalogue__controls">
+      <div class="field catalogue__search">
+        <label class="field__label" for="terminal-search">Search catalogue</label>
+        <input
+          id="terminal-search"
+          class="input"
+          type="search"
+          placeholder="Name or SKU"
+          [value]="searchTerm()"
+          (input)="onSearchInput($any($event.target).value)"
+        />
+      </div>
+
+      <div class="field catalogue__barcode">
+        <label class="field__label" for="terminal-barcode">Scan barcode</label>
+        <input
+          id="terminal-barcode"
+          class="input"
+          type="text"
+          placeholder="Scan or type, then Enter"
+          [ngModel]="barcode()"
+          (ngModelChange)="barcode.set($event)"
+          (keyup.enter)="onBarcodeSubmit()"
+        />
+      </div>
+    </div>
+
+    <div class="chips" role="group" aria-label="Filter by category">
+      <button
+        type="button"
+        class="chip"
+        [class.chip--active]="activeCategoryId() === null"
+        (click)="selectCategory(null)"
+      >
+        All
+      </button>
+      @for (category of categories(); track category.id) {
+        <button
+          type="button"
+          class="chip"
+          [class.chip--active]="activeCategoryId() === category.id"
+          [style.--chip-accent]="category.color || '#2563eb'"
+          (click)="selectCategory(category.id)"
+        >
+          {{ category.name }}
+        </button>
+      }
+    </div>
+
+    @if (loadingProducts()) {
+      <div class="loading-row"><span class="spinner"></span> Loading products…</div>
+    }
+
+    @if (!loadingProducts() && visibleProducts().length === 0) {
+      <div class="card">
+        <p class="empty-state">
+          No products match this filter.
+          @if (searchTerm()) { Try a different search term. }
+        </p>
+      </div>
+    }
+
+    <div class="tiles">
+      @for (product of visibleProducts(); track product.id) {
+        <button
+          type="button"
+          class="tile"
+          [class.tile--disabled]="product.trackStock && product.stockQuantity <= 0"
+          [disabled]="product.trackStock && product.stockQuantity <= 0"
+          [style.--tile-accent]="product.category?.color || '#94a3b8'"
+          (click)="addToCart(product)"
+          [attr.aria-label]="'Add ' + product.name + ' to basket'"
+        >
+          <span class="tile__name">{{ product.name }}</span>
+          <span class="tile__sku">{{ product.sku }}</span>
+          <span class="tile__footer">
+            <span class="tile__price">{{ product.price | money }}</span>
+            <span class="badge {{ stockBadge(product) }}">{{ stockLabel(product) }}</span>
+          </span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------------------- basket -->
+  <aside class="basket" aria-label="Current sale">
+    <header class="basket__header">
+      <div>
+        <h2>Current sale</h2>
+        <p class="muted basket__count">
+          {{ cart.lineCount() }} {{ cart.lineCount() === 1 ? 'line' : 'lines' }} &middot;
+          {{ cart.unitCount() }} {{ cart.unitCount() === 1 ? 'unit' : 'units' }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="btn btn--ghost btn--sm"
+        [disabled]="cart.isEmpty()"
+        (click)="clearBasket()"
+      >
+        Clear
+      </button>
+    </header>
+
+    <div class="basket__lines">
+      @if (cart.isEmpty()) {
+        <p class="empty-state">
+          Scan a barcode or tap a product to start a sale.
+        </p>
+      }
+
+      @for (line of cart.lines(); track line.productId) {
+        <article class="line">
+          <div class="line__top">
+            <div class="line__identity">
+              <span class="line__name">{{ line.name }}</span>
+              <span class="line__sku">{{ line.sku }}</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn--danger-ghost btn--sm"
+              (click)="cart.remove(line.productId)"
+              [attr.aria-label]="'Remove ' + line.name"
+            >
+              Remove
+            </button>
+          </div>
+
+          <div class="line__controls">
+            <div class="stepper" role="group" [attr.aria-label]="'Quantity for ' + line.name">
+              <button
+                type="button"
+                class="stepper__btn"
+                (click)="cart.decrement(line.productId)"
+                aria-label="Decrease quantity"
+              >
+                &minus;
+              </button>
+              <input
+                class="stepper__input"
+                type="number"
+                min="1"
+                step="1"
+                [value]="line.quantity"
+                (change)="changeQuantity(line.productId, $any($event.target).value)"
+                [attr.aria-label]="'Quantity for ' + line.name"
+              />
+              <button
+                type="button"
+                class="stepper__btn"
+                (click)="increment(line.productId)"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+
+            <div class="line__money">
+              <label class="line__mini">
+                <span>Price</span>
+                <input
+                  class="input input--mini"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [value]="line.unitPrice"
+                  (change)="changeUnitPrice(line.productId, $any($event.target).value)"
+                />
+              </label>
+              <label class="line__mini">
+                <span>Disc.</span>
+                <input
+                  class="input input--mini"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [value]="line.discountAmount"
+                  (change)="changeLineDiscount(line.productId, $any($event.target).value)"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="line__summary">
+            @if (line.unitPrice !== line.listPrice) {
+              <span class="badge badge--warning">Price override</span>
+            }
+            @if (line.taxRate > 0) {
+              <span class="muted line__tax">Tax {{ line.taxRate }}%</span>
+            }
+            <span class="line__total">{{ lineTotals(line.productId)?.lineTotal | money }}</span>
+          </div>
+        </article>
+      }
+    </div>
+
+    <div class="basket__foot">
+      <div class="totals">
+        <div class="totals__row">
+          <span>Subtotal</span>
+          <span class="numeric">{{ cart.subtotal() | money }}</span>
+        </div>
+        @if (cart.lineDiscountTotal() > 0) {
+          <div class="totals__row">
+            <span>Line discounts</span>
+            <span class="numeric">-{{ cart.lineDiscountTotal() | money }}</span>
+          </div>
+        }
+        @if (cart.taxTotal() > 0) {
+          <div class="totals__row">
+            <span>Tax</span>
+            <span class="numeric">{{ cart.taxTotal() | money }}</span>
+          </div>
+        }
+        <div class="totals__row totals__row--input">
+          <label for="order-discount">Order discount</label>
+          <input
+            id="order-discount"
+            class="input input--mini"
+            type="number"
+            min="0"
+            step="0.01"
+            [value]="cart.orderDiscount()"
+            (change)="changeOrderDiscount($any($event.target).value)"
+          />
+        </div>
+        <div class="totals__row totals__row--grand">
+          <span>Total due</span>
+          <span class="numeric">{{ cart.total() | money }}</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="terminal-cashier">Cashier</label>
+        <input
+          id="terminal-cashier"
+          class="input"
+          type="text"
+          placeholder="Staff"
+          [ngModel]="cart.cashierName()"
+          (ngModelChange)="cart.setCashierName($event)"
+        />
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="terminal-customer">Customer (optional)</label>
+        <select
+          id="terminal-customer"
+          class="select"
+          [value]="cart.customerId() ?? ''"
+          (change)="changeCustomer($any($event.target).value)"
+        >
+          <option value="">Walk-in</option>
+          @for (customer of customers(); track customer.id) {
+            <option [value]="customer.id">{{ customer.name }}</option>
+          }
+        </select>
+      </div>
+
+      <fieldset class="payment">
+        <legend class="field__label">Payment method</legend>
+        <div class="payment__options">
+          @for (method of paymentMethods; track method.value) {
+            <button
+              type="button"
+              class="chip"
+              [class.chip--active]="paymentMethod() === method.value"
+              (click)="paymentMethod.set(method.value)"
+            >
+              {{ method.label }}
+            </button>
+          }
+        </div>
+      </fieldset>
+
+      @if (isCash()) {
+        <div class="field">
+          <label class="field__label" for="terminal-tendered">Amount tendered</label>
+          <input
+            id="terminal-tendered"
+            class="input"
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            [ngModel]="tendered()"
+            (ngModelChange)="tendered.set($event)"
+          />
+          @if (quickTenders().length) {
+            <div class="quick-tenders">
+              @for (amount of quickTenders(); track amount) {
+                <button type="button" class="btn btn--secondary btn--sm" (click)="applyQuickTender(amount)">
+                  {{ amount | money }}
+                </button>
+              }
+            </div>
+          }
+          @if (tenderedAmount() > 0 && changeDue() >= 0) {
+            <p class="field__hint change">Change due {{ changeDue() | money }}</p>
+          }
+          @if (tenderedAmount() > 0 && changeDue() < 0) {
+            <p class="field__error">Short by {{ -changeDue() | money }}</p>
+          }
+        </div>
+      }
+
+      <div class="field">
+        <label class="field__label" for="terminal-note">Note (optional)</label>
+        <input
+          id="terminal-note"
+          class="input"
+          type="text"
+          placeholder="Anything worth recording"
+          [ngModel]="cart.note()"
+          (ngModelChange)="cart.setNote($event)"
+        />
+      </div>
+
+      <button
+        type="button"
+        class="btn btn--primary btn--block btn--lg"
+        [disabled]="!canCheckout()"
+        (click)="checkout()"
+      >
+        @if (submitting()) { Processing… } @else { Charge {{ cart.total() | money }} }
+      </button>
+    </div>
+  </aside>
+</div>
+
+<!-- ------------------------------------------------------------------- receipt -->
+@if (completedSale(); as sale) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+    <div class="modal modal--narrow">
+      <header class="modal__header">
+        <div>
+          <h2 id="receipt-title">Sale complete</h2>
+          <p class="muted">Change due {{ sale.changeDue | money }}</p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="closeReceipt()" aria-label="Close receipt">
+          &times;
+        </button>
+      </header>
+      <div class="modal__body">
+        <app-receipt [sale]="sale" />
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--secondary" (click)="printReceipt()">Print</button>
+        <button type="button" class="btn btn--primary" (click)="closeReceipt()">New sale</button>
+      </footer>
+    </div>
+  </div>
+}

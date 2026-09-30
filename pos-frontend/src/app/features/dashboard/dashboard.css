@@ -1,0 +1,144 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+}
+
+.kpi--alert {
+  border-left-color: var(--warning);
+}
+
+.kpi__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.kpi__value {
+  font-size: 1.625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.kpi__meta {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+/* --- Bar chart (plain CSS: no charting dependency for 14 bars) --- */
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.375rem;
+  height: 11rem;
+}
+
+.chart__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  height: 100%;
+}
+
+.chart__bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.chart__bar {
+  width: 100%;
+  border-radius: 0.25rem 0.25rem 0 0;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  min-height: 2px;
+}
+
+.chart__bar--empty {
+  background: var(--border);
+}
+
+.chart__label {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transform: rotate(-45deg);
+  transform-origin: center;
+}
+
+/* --- Payment breakdown --- */
+
+.breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.breakdown__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.breakdown__track {
+  margin-top: 0.3125rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.breakdown__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.breakdown__meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* --- Table cells --- */
+
+.cell__primary {
+  display: block;
+  font-weight: 600;
+}
+
+.cell__secondary {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

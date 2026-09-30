@@ -1,0 +1,484 @@
+<div class="page">
+  <header class="page__header">
+    <div class="page__title">
+      <h1>Products</h1>
+      <p class="page__subtitle">
+        Catalogue, pricing and stock. Stock changes go through an adjustment so every
+        movement is recorded.
+      </p>
+    </div>
+    <button type="button" class="btn btn--primary" (click)="openCreate()">Add product</button>
+  </header>
+
+  <div class="card">
+    <div class="card__body toolbar">
+      <div class="field filter-grow">
+        <label class="field__label" for="product-search">Search</label>
+        <input
+          id="product-search"
+          class="input"
+          type="search"
+          placeholder="Name, SKU or barcode"
+          [value]="search()"
+          (change)="onSearchInput($any($event.target).value)"
+        />
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="product-category">Category</label>
+        <select
+          id="product-category"
+          class="select"
+          [value]="categoryFilter() ?? ''"
+          (change)="onCategoryFilter($any($event.target).value)"
+        >
+          <option value="">All categories</option>
+          @for (category of categories(); track category.id) {
+            <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="product-status">Status</label>
+        <select
+          id="product-status"
+          class="select"
+          [value]="activeFilter()"
+          (change)="onActiveFilter($any($event.target).value)"
+        >
+          <option value="active">Active only</option>
+          <option value="inactive">Inactive only</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+
+      <button
+        type="button"
+        class="btn"
+        [class.btn--primary]="lowStockOnly()"
+        [class.btn--secondary]="!lowStockOnly()"
+        (click)="toggleLowStock()"
+      >
+        Low stock only
+      </button>
+    </div>
+
+    @if (loading()) {
+      <div class="card__body loading-row"><span class="spinner"></span> Loading…</div>
+    }
+
+    @if (!loading() && page().content.length === 0) {
+      <p class="empty-state">No products match these filters.</p>
+    }
+
+    @if (page().content.length > 0) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">
+                <button type="button" class="sort" (click)="sortBy('name')">Product</button>
+              </th>
+              <th scope="col">
+                <button type="button" class="sort" (click)="sortBy('sku')">SKU</button>
+              </th>
+              <th scope="col">Category</th>
+              <th scope="col" class="numeric">
+                <button type="button" class="sort" (click)="sortBy('price')">Price</button>
+              </th>
+              <th scope="col" class="numeric">Tax</th>
+              <th scope="col" class="numeric">
+                <button type="button" class="sort" (click)="sortBy('stockQuantity')">Stock</button>
+              </th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (product of page().content; track product.id) {
+              <tr>
+                <td>
+                  <span class="cell__primary">{{ product.name }}</span>
+                  @if (product.barcode) {
+                    <span class="cell__secondary">{{ product.barcode }}</span>
+                  }
+                </td>
+                <td><code class="code">{{ product.sku }}</code></td>
+                <td>{{ product.category?.name ?? '—' }}</td>
+                <td class="numeric">{{ product.price | money }}</td>
+                <td class="numeric">{{ product.taxRate }}%</td>
+                <td class="numeric">
+                  <span class="badge {{ stockBadgeClass(product) }}">
+                    {{ product.trackStock ? product.stockQuantity + ' ' + product.unit : 'n/a' }}
+                  </span>
+                </td>
+                <td>
+                  @if (product.active) {
+                    <span class="badge badge--success">Active</span>
+                  } @else {
+                    <span class="badge badge--neutral">Inactive</span>
+                  }
+                </td>
+                <td>
+                  <div class="table__actions">
+                    <button type="button" class="btn btn--secondary btn--sm" (click)="openStock(product)">
+                      Stock
+                    </button>
+                    <button type="button" class="btn btn--secondary btn--sm" (click)="openEdit(product)">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--danger-ghost btn--sm"
+                      (click)="confirmDelete(product)"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span>{{ rangeLabel() }}</span>
+        <div class="pager__controls">
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="page().first"
+            (click)="goToPage(page().page - 1)"
+          >
+            Previous
+          </button>
+          <span>Page {{ page().page + 1 }} of {{ page().totalPages || 1 }}</span>
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="page().last"
+            (click)="goToPage(page().page + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- product form -->
+@if (formOpen()) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="product-form-title">
+    <div class="modal">
+      <header class="modal__header">
+        <h2 id="product-form-title">{{ isEditing() ? 'Edit product' : 'Add product' }}</h2>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="closeForm()" aria-label="Close">
+          &times;
+        </button>
+      </header>
+
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <div class="modal__body form-grid">
+          <div class="field">
+            <label class="field__label" for="form-sku">SKU</label>
+            <input
+              id="form-sku"
+              class="input"
+              [class.input--invalid]="fieldError('sku')"
+              formControlName="sku"
+              autocomplete="off"
+            />
+            @if (fieldError('sku')) { <span class="field__error">{{ fieldError('sku') }}</span> }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-barcode">Barcode</label>
+            <input
+              id="form-barcode"
+              class="input"
+              [class.input--invalid]="fieldError('barcode')"
+              formControlName="barcode"
+              autocomplete="off"
+            />
+            @if (fieldError('barcode')) {
+              <span class="field__error">{{ fieldError('barcode') }}</span>
+            } @else {
+              <span class="field__hint">Optional. Enables barcode scanning at the till.</span>
+            }
+          </div>
+
+          <div class="field form-grid__wide">
+            <label class="field__label" for="form-name">Name</label>
+            <input
+              id="form-name"
+              class="input"
+              [class.input--invalid]="fieldError('name')"
+              formControlName="name"
+            />
+            @if (fieldError('name')) { <span class="field__error">{{ fieldError('name') }}</span> }
+          </div>
+
+          <div class="field form-grid__wide">
+            <label class="field__label" for="form-description">Description</label>
+            <textarea id="form-description" class="textarea" formControlName="description"></textarea>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-price">Selling price (excl. tax)</label>
+            <input
+              id="form-price"
+              class="input"
+              type="number"
+              min="0"
+              step="0.01"
+              [class.input--invalid]="fieldError('price')"
+              formControlName="price"
+            />
+            @if (fieldError('price')) { <span class="field__error">{{ fieldError('price') }}</span> }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-cost">Unit cost</label>
+            <input
+              id="form-cost"
+              class="input"
+              type="number"
+              min="0"
+              step="0.01"
+              formControlName="cost"
+            />
+            <span class="field__hint">Drives the profit figures on the dashboard.</span>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-tax">Tax rate (%)</label>
+            <input
+              id="form-tax"
+              class="input"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              [class.input--invalid]="fieldError('taxRate')"
+              formControlName="taxRate"
+            />
+            @if (fieldError('taxRate')) {
+              <span class="field__error">{{ fieldError('taxRate') }}</span>
+            }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-unit">Unit of measure</label>
+            <input id="form-unit" class="input" formControlName="unit" placeholder="pc" />
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-stock">
+              {{ isEditing() ? 'Stock on hand' : 'Opening stock' }}
+            </label>
+            <input
+              id="form-stock"
+              class="input"
+              type="number"
+              min="0"
+              step="1"
+              formControlName="stockQuantity"
+            />
+            <span class="field__hint">
+              @if (isEditing()) {
+                Use the Stock button to change this; every movement is journalled.
+              } @else {
+                Recorded as an opening delivery.
+              }
+            </span>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-reorder">Reorder level</label>
+            <input
+              id="form-reorder"
+              class="input"
+              type="number"
+              min="0"
+              step="1"
+              formControlName="reorderLevel"
+            />
+            <span class="field__hint">Flagged as low stock at or below this.</span>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="form-category">Category</label>
+            <select id="form-category" class="select" formControlName="categoryId">
+              <option [value]="null">Uncategorised</option>
+              @for (category of categories(); track category.id) {
+                <option [value]="category.id">{{ category.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field form-grid__wide toggles">
+            <label class="checkbox">
+              <input type="checkbox" formControlName="active" />
+              <span>Active &mdash; available at the till</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" formControlName="trackStock" />
+              <span>Track stock &mdash; uncheck for services</span>
+            </label>
+          </div>
+        </div>
+
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--secondary" (click)="closeForm()">Cancel</button>
+          <button type="submit" class="btn btn--primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : isEditing() ? 'Save changes' : 'Add product' }}
+          </button>
+        </footer>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- --------------------------------------------------------- stock adjustment -->
+@if (stockTarget(); as product) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="stock-title">
+    <div class="modal">
+      <header class="modal__header">
+        <div>
+          <h2 id="stock-title">Stock &mdash; {{ product.name }}</h2>
+          <p class="muted">
+            On hand {{ product.stockQuantity }} {{ product.unit }} &middot; reorder at
+            {{ product.reorderLevel }}
+          </p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="closeStock()" aria-label="Close">
+          &times;
+        </button>
+      </header>
+
+      <div class="modal__body">
+        <form [formGroup]="stockForm" (ngSubmit)="submitStock()" class="stock-form">
+          <div class="field">
+            <label class="field__label" for="stock-direction">Direction</label>
+            <select
+              id="stock-direction"
+              class="select"
+              [value]="stockForm.controls.direction.value"
+              (change)="onDirectionChange($any($event.target).value)"
+            >
+              <option value="increase">Increase</option>
+              <option value="decrease">Decrease</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="stock-quantity">Quantity</label>
+            <input
+              id="stock-quantity"
+              class="input"
+              type="number"
+              min="1"
+              step="1"
+              formControlName="quantity"
+            />
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="stock-type">Reason type</label>
+            <select id="stock-type" class="select" formControlName="type">
+              @for (option of movementTypes; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field stock-form__wide">
+            <label class="field__label" for="stock-reason">Note</label>
+            <input
+              id="stock-reason"
+              class="input"
+              formControlName="reason"
+              placeholder="e.g. delivery 4471, or stock count on 12 Sep"
+            />
+          </div>
+
+          <div class="stock-form__actions">
+            <button type="submit" class="btn btn--primary" [disabled]="saving()">
+              {{ saving() ? 'Applying…' : 'Apply adjustment' }}
+            </button>
+          </div>
+        </form>
+
+        <h3 class="stock-history__title">Recent movements</h3>
+        @if (movementsLoading()) {
+          <div class="loading-row"><span class="spinner"></span> Loading history…</div>
+        } @else if (movements().length === 0) {
+          <p class="muted">No movements recorded yet.</p>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Type</th>
+                  <th scope="col" class="numeric">Change</th>
+                  <th scope="col" class="numeric">After</th>
+                  <th scope="col">Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (movement of movements(); track movement.id) {
+                  <tr>
+                    <td>{{ movement.type === 'SALE' ? 'Sale' : movementLabel(movement.type) }}</td>
+                    <td class="numeric" [class.negative]="movement.quantityChange < 0">
+                      {{ movement.quantityChange > 0 ? '+' : '' }}{{ movement.quantityChange }}
+                    </td>
+                    <td class="numeric">{{ movement.quantityAfter }}</td>
+                    <td>
+                      <span class="cell__primary">{{ movement.reference ?? '—' }}</span>
+                      @if (movement.reason) {
+                        <span class="cell__secondary">{{ movement.reason }}</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--secondary" (click)="closeStock()">Close</button>
+      </footer>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------------------ delete confirm -->
+@if (confirmingDelete(); as product) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+    <div class="modal modal--narrow">
+      <header class="modal__header">
+        <h2 id="delete-title">Remove product</h2>
+      </header>
+      <div class="modal__body">
+        <p>
+          Remove <strong>{{ product.name }}</strong> from the catalogue?
+        </p>
+        <p class="muted delete-note">
+          If it appears in past sales it is deactivated instead of deleted, so receipts stay
+          intact.
+        </p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--secondary" (click)="cancelDelete()">Cancel</button>
+        <button type="button" class="btn btn--danger" [disabled]="saving()" (click)="deleteProduct()">
+          {{ saving() ? 'Removing…' : 'Remove' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}

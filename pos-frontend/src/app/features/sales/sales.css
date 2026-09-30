@@ -1,0 +1,40 @@
+.filter-grow {
+  flex: 1 1 14rem;
+}
+
+.cell__primary {
+  display: block;
+  font-weight: 600;
+}
+
+.cell__secondary {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.reference {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.row--voided .reference,
+.row--voided .cell__primary {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.page-total {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.void-note {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.void-form {
+  margin-top: 0.875rem;
+}

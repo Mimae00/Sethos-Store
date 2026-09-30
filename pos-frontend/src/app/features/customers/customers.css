@@ -1,0 +1,25 @@
+.filter-grow {
+  flex: 1 1 16rem;
+}
+
+.cell__primary {
+  display: block;
+  font-weight: 600;
+}
+
+.cell__secondary {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.delete-note {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+}

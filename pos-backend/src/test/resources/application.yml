@@ -1,0 +1,14 @@
+# Test overrides: in-memory database, no demo data, so `mvn test` never touches ./data.
+spring:
+  datasource:
+    url: jdbc:h2:mem:postest;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+pos:
+  seed-demo-data: false
+  time-zone: UTC

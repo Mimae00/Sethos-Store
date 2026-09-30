@@ -1,0 +1,24 @@
+# Portable Node toolchain downloaded to build the frontend on this machine.
+# Not part of the project: see the README for the Node version requirement.
+.tooling/
+
+# Build output
+pos-backend/target/
+pos-frontend/dist/
+pos-frontend/node_modules/
+pos-frontend/.angular/
+
+# Local H2 database files created by the default profile
+pos-backend/data/
+
+# Local environment overrides for docker compose
+.env
+
+# Logs
+*.log
+
+# Editors and OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db

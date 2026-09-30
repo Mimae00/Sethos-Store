@@ -1,0 +1,89 @@
+# ---------------------------------------------------------------------------
+# Default profile: H2, the embedded database that ships with Spring Boot.
+# Zero setup, and the file-based URL below means data survives a restart.
+# Switch to PostgreSQL with:  --spring.profiles.active=postgres
+# ---------------------------------------------------------------------------
+spring:
+  application:
+    name: sethos-store-backend
+
+  datasource:
+    # AUTO_SERVER lets the H2 console (and any external tool) attach while the app runs.
+    url: jdbc:h2:file:./data/posdb;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+    hikari:
+      pool-name: pos-h2-pool
+      maximum-pool-size: 10
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      # Fine for development. A real deployment should switch to `validate` and let
+      # Flyway or Liquibase own the schema.
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+  jackson:
+    # Boot 4 ships Jackson 3, which already writes java.time values as ISO-8601 strings,
+    # so no date feature flags are needed here.
+    serialization:
+      indent-output: false
+    default-property-inclusion: always
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+  error:
+    include-message: never
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.possystem.pos: INFO
+    org.hibernate.SQL: WARN
+
+# ---------------------------------------------------------------------------
+# Store settings. Served to the Angular client at GET /api/settings.
+# ---------------------------------------------------------------------------
+pos:
+  store-name: Sethos Store
+  store-address: 123 Market Street, Downtown
+  store-phone: "+1 555 0100"
+  tax-identifier: TIN-000-000-000
+  currency-code: USD
+  currency-symbol: $
+  # Drives "today" for reports and receipt numbering. Set this to the store's zone,
+  # e.g. Asia/Manila, America/New_York.
+  time-zone: UTC
+  default-tax-rate: 0.00
+  receipt-footer: Thank you for shopping with us!
+  seed-demo-data: true
+  allowed-origins:
+    - http://localhost:4200
+    - http://127.0.0.1:4200

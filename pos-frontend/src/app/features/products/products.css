@@ -1,0 +1,97 @@
+.filter-grow {
+  flex: 1 1 14rem;
+}
+
+.sort {
+  font: inherit;
+  font-size: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sort:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  background: var(--surface-muted);
+  padding: 0.0625rem 0.3125rem;
+  border-radius: var(--radius-sm);
+}
+
+.cell__primary {
+  display: block;
+  font-weight: 600;
+}
+
+.cell__secondary {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.negative {
+  color: var(--danger);
+}
+
+/* --- Forms inside the modals --- */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem;
+}
+
+.form-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.toggles {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+.stock-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.875rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.stock-form__wide {
+  grid-column: 1 / -1;
+}
+
+.stock-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.stock-history__title {
+  margin-bottom: 0.5rem;
+}
+
+.delete-note {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 40rem) {
+  .form-grid,
+  .stock-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,0 +1,235 @@
+<div class="page">
+  <header class="page__header">
+    <div class="page__title">
+      <h1>Dashboard</h1>
+      <p class="page__subtitle">Trading summary for today, the last 7 days and the month so far.</p>
+    </div>
+    <div class="toolbar">
+      <button type="button" class="btn btn--secondary" (click)="load()" [disabled]="loading()">
+        Refresh
+      </button>
+      <a class="btn btn--primary" routerLink="/terminal">Open terminal</a>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="card"><div class="card__body loading-row"><span class="spinner"></span> Loading figures…</div></div>
+  }
+
+  @if (failed() && !loading()) {
+    <div class="card">
+      <p class="empty-state">
+        The dashboard could not be loaded. Check the API is running, then
+        <button type="button" class="btn btn--secondary btn--sm" (click)="load()">try again</button>.
+      </p>
+    </div>
+  }
+
+  @if (data(); as dashboard) {
+    <!-- ------------------------------------------------------------- KPI cards -->
+    <section class="kpis" aria-label="Key figures">
+      <article class="kpi">
+        <p class="kpi__label">Collected today</p>
+        <p class="kpi__value">{{ dashboard.today.totalCollected | money }}</p>
+        <p class="kpi__meta">
+          {{ dashboard.today.saleCount }} {{ dashboard.today.saleCount === 1 ? 'sale' : 'sales' }} &middot;
+          {{ dashboard.today.unitsSold }} units
+        </p>
+      </article>
+
+      <article class="kpi">
+        <p class="kpi__label">Gross profit today</p>
+        <p class="kpi__value">{{ dashboard.today.grossProfit | money }}</p>
+        <p class="kpi__meta">{{ marginPercent() | number: '1.0-1' }}% margin on net sales</p>
+      </article>
+
+      <article class="kpi">
+        <p class="kpi__label">Average sale</p>
+        <p class="kpi__value">{{ dashboard.today.averageSaleValue | money }}</p>
+        <p class="kpi__meta">Tax collected {{ dashboard.today.taxTotal | money }}</p>
+      </article>
+
+      <article class="kpi" [class.kpi--alert]="dashboard.lowStockCount > 0">
+        <p class="kpi__label">Needs reordering</p>
+        <p class="kpi__value">{{ dashboard.lowStockCount }}</p>
+        <p class="kpi__meta">of {{ dashboard.activeProducts }} active products</p>
+      </article>
+    </section>
+
+    <section class="columns">
+      <!-- ------------------------------------------------------------- chart -->
+      <div class="card">
+        <div class="card__header">
+          <h2>Last 14 days</h2>
+          <span class="muted">Inventory at cost {{ dashboard.inventoryCostValue | money }}</span>
+        </div>
+        <div class="card__body">
+          @if (hasSalesInChart()) {
+            <div class="chart" role="img" aria-label="Daily sales totals for the last 14 days">
+              @for (point of dashboard.dailySales; track point.date) {
+                <div class="chart__col">
+                  <div class="chart__bar-wrap">
+                    <div
+                      class="chart__bar"
+                      [class.chart__bar--empty]="point.saleCount === 0"
+                      [style.height]="barHeight(point.total)"
+                      [attr.title]="point.date + ': ' + point.saleCount + ' sales'"
+                    ></div>
+                  </div>
+                  <span class="chart__label">{{ point.date | date: 'd MMM' }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="empty-state">No sales recorded in the last 14 days yet.</p>
+          }
+        </div>
+      </div>
+
+      <!-- ----------------------------------------------------------- periods -->
+      <div class="card">
+        <div class="card__header"><h2>Period comparison</h2></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Period</th>
+                <th scope="col" class="numeric">Sales</th>
+                <th scope="col" class="numeric">Net</th>
+                <th scope="col" class="numeric">Collected</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Today</th>
+                <td class="numeric">{{ dashboard.today.saleCount }}</td>
+                <td class="numeric">{{ dashboard.today.netSales | money }}</td>
+                <td class="numeric">{{ dashboard.today.totalCollected | money }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Last 7 days</th>
+                <td class="numeric">{{ dashboard.last7Days.saleCount }}</td>
+                <td class="numeric">{{ dashboard.last7Days.netSales | money }}</td>
+                <td class="numeric">{{ dashboard.last7Days.totalCollected | money }}</td>
+              </tr>
+              <tr>
+                <th scope="row">Month to date</th>
+                <td class="numeric">{{ dashboard.thisMonth.saleCount }}</td>
+                <td class="numeric">{{ dashboard.thisMonth.netSales | money }}</td>
+                <td class="numeric">{{ dashboard.thisMonth.totalCollected | money }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="columns">
+      <!-- ----------------------------------------------------- top products -->
+      <div class="card">
+        <div class="card__header">
+          <h2>Best sellers</h2>
+          <span class="muted">Last 30 days</span>
+        </div>
+        @if (dashboard.topProducts.length) {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Product</th>
+                  <th scope="col" class="numeric">Units</th>
+                  <th scope="col" class="numeric">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (product of dashboard.topProducts; track product.sku) {
+                  <tr>
+                    <td>
+                      <span class="cell__primary">{{ product.name }}</span>
+                      <span class="cell__secondary">{{ product.sku }}</span>
+                    </td>
+                    <td class="numeric">{{ product.quantitySold }}</td>
+                    <td class="numeric">{{ product.revenue | money }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="empty-state">No sales in the last 30 days.</p>
+        }
+      </div>
+
+      <!-- ------------------------------------------------------- payments -->
+      <div class="card">
+        <div class="card__header">
+          <h2>Today by payment method</h2>
+        </div>
+        <div class="card__body">
+          @if (dashboard.paymentBreakdown.length) {
+            <ul class="breakdown">
+              @for (entry of dashboard.paymentBreakdown; track entry.paymentMethod) {
+                <li class="breakdown__row">
+                  <div class="breakdown__head">
+                    <span>{{ paymentLabel(entry.paymentMethod) }}</span>
+                    <span class="numeric">{{ entry.total | money }}</span>
+                  </div>
+                  <div class="breakdown__track">
+                    <div class="breakdown__fill" [style.width.%]="paymentShare(entry.total)"></div>
+                  </div>
+                  <span class="breakdown__meta">
+                    {{ entry.saleCount }} {{ entry.saleCount === 1 ? 'sale' : 'sales' }}
+                  </span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="empty-state">Nothing taken yet today.</p>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- low stock -->
+    <div class="card">
+      <div class="card__header">
+        <h2>Low stock</h2>
+        <a class="btn btn--secondary btn--sm" routerLink="/products">Manage products</a>
+      </div>
+      @if (dashboard.lowStockProducts.length) {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Category</th>
+                <th scope="col" class="numeric">On hand</th>
+                <th scope="col" class="numeric">Reorder at</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (product of dashboard.lowStockProducts; track product.id) {
+                <tr>
+                  <td>
+                    <span class="cell__primary">{{ product.name }}</span>
+                    <span class="cell__secondary">{{ product.sku }}</span>
+                  </td>
+                  <td>{{ product.category?.name ?? '—' }}</td>
+                  <td class="numeric">
+                    <span class="badge" [class.badge--danger]="product.stockQuantity <= 0"
+                          [class.badge--warning]="product.stockQuantity > 0">
+                      {{ product.stockQuantity }} {{ product.unit }}
+                    </span>
+                  </td>
+                  <td class="numeric">{{ product.reorderLevel }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="empty-state">Every product is above its reorder level.</p>
+      }
+    </div>
+  }
+</div>

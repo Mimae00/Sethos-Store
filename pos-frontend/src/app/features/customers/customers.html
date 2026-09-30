@@ -1,0 +1,186 @@
+<div class="page">
+  <header class="page__header">
+    <div class="page__title">
+      <h1>Customers</h1>
+      <p class="page__subtitle">
+        Optional buyer records. Attaching one to a sale prints their name on the receipt.
+      </p>
+    </div>
+    <button type="button" class="btn btn--primary" (click)="openCreate()">Add customer</button>
+  </header>
+
+  <div class="card">
+    <div class="card__body toolbar">
+      <div class="field filter-grow">
+        <label class="field__label" for="customer-search">Search</label>
+        <input
+          id="customer-search"
+          class="input"
+          type="search"
+          placeholder="Name, phone or email"
+          [value]="search()"
+          (change)="onSearch($any($event.target).value)"
+        />
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="card__body loading-row"><span class="spinner"></span> Loading…</div>
+    } @else if (page().content.length === 0) {
+      <p class="empty-state">No customers found.</p>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Customer</th>
+              <th scope="col">Contact</th>
+              <th scope="col">Address</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (customer of page().content; track customer.id) {
+              <tr>
+                <td>
+                  <span class="cell__primary">{{ customer.name }}</span>
+                  @if (customer.notes) {
+                    <span class="cell__secondary">{{ customer.notes }}</span>
+                  }
+                </td>
+                <td>
+                  <span class="cell__primary">{{ customer.phone ?? '—' }}</span>
+                  @if (customer.email) {
+                    <span class="cell__secondary">{{ customer.email }}</span>
+                  }
+                </td>
+                <td class="muted">{{ customer.address ?? '—' }}</td>
+                <td>
+                  <div class="table__actions">
+                    <button type="button" class="btn btn--secondary btn--sm" (click)="openEdit(customer)">
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--danger-ghost btn--sm"
+                      (click)="confirmDelete(customer)"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span>{{ rangeLabel() }}</span>
+        <div class="pager__controls">
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="page().first"
+            (click)="goToPage(page().page - 1)"
+          >
+            Previous
+          </button>
+          <span>Page {{ page().page + 1 }} of {{ page().totalPages || 1 }}</span>
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="page().last"
+            (click)="goToPage(page().page + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+@if (formOpen()) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="customer-form-title">
+    <div class="modal modal--narrow">
+      <header class="modal__header">
+        <h2 id="customer-form-title">{{ isEditing() ? 'Edit customer' : 'Add customer' }}</h2>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="closeForm()" aria-label="Close">
+          &times;
+        </button>
+      </header>
+
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <div class="modal__body form-stack">
+          <div class="field">
+            <label class="field__label" for="customer-name">Name</label>
+            <input
+              id="customer-name"
+              class="input"
+              [class.input--invalid]="fieldError('name')"
+              formControlName="name"
+            />
+            @if (fieldError('name')) { <span class="field__error">{{ fieldError('name') }}</span> }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="customer-phone">Phone</label>
+            <input id="customer-phone" class="input" formControlName="phone" />
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="customer-email">Email</label>
+            <input
+              id="customer-email"
+              class="input"
+              type="email"
+              [class.input--invalid]="fieldError('email')"
+              formControlName="email"
+            />
+            @if (fieldError('email')) { <span class="field__error">{{ fieldError('email') }}</span> }
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="customer-address">Address</label>
+            <input id="customer-address" class="input" formControlName="address" />
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="customer-notes">Notes</label>
+            <textarea id="customer-notes" class="textarea" formControlName="notes"></textarea>
+          </div>
+        </div>
+
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--secondary" (click)="closeForm()">Cancel</button>
+          <button type="submit" class="btn btn--primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : isEditing() ? 'Save changes' : 'Add customer' }}
+          </button>
+        </footer>
+      </form>
+    </div>
+  </div>
+}
+
+@if (confirmingDelete(); as customer) {
+  <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="customer-delete-title">
+    <div class="modal modal--narrow">
+      <header class="modal__header">
+        <h2 id="customer-delete-title">Delete customer</h2>
+      </header>
+      <div class="modal__body">
+        <p>Delete <strong>{{ customer.name }}</strong>?</p>
+        <p class="muted delete-note">
+          Their past sales are kept and simply become walk-in sales.
+        </p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--secondary" (click)="cancelDelete()">Cancel</button>
+        <button type="button" class="btn btn--danger" [disabled]="saving()" (click)="deleteCustomer()">
+          {{ saving() ? 'Deleting…' : 'Delete' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}

@@ -1,13 +1,19 @@
 # ---------------------------------------------------------------------------
-# PostgreSQL for the Sethos Store backend.
+# Sethos Store: full stack in containers.
 #
-#   docker compose up -d                      # database only
-#   docker compose --profile tools up -d      # database + pgAdmin on :5050
+#   docker compose up -d --build              # postgres + backend + frontend
+#   docker compose --profile tools up -d      # ...plus pgAdmin on :5050
+#   docker compose up -d postgres             # database only, for local dev
 #
-# Then start the API with the matching profile:
-#   cd pos-backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+# Then open http://localhost:8081
 #
-# The default (no profile) backend uses H2 instead and needs none of this.
+# Traffic flow:
+#   browser -> frontend (nginx :8081) -> /api/* -> backend (:8080) -> postgres (:5432)
+#
+# Only the frontend is published to the host. The backend is reachable solely through
+# nginx, so actuator endpoints and the raw API are not exposed directly.
+#
+# Settings can be overridden in a .env file next to this one; see .env.example.
 # ---------------------------------------------------------------------------
 
 # Fixed project name so containers, network and volumes are named after the store
@@ -23,13 +29,14 @@ services:
     environment:
       POSTGRES_DB: posdb
       POSTGRES_USER: posuser
-      # Local development credential. Override via a .env file or your secret
-      # manager before this goes anywhere near a shared environment.
+      # Local development credential. Set POSTGRES_PASSWORD in .env before this goes
+      # anywhere near a shared environment.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pospassword}
-      # Slightly faster and more predictable collation behaviour than the default.
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5432:5432"
+      # Loopback only: lets a locally run backend or psql connect, without exposing the
+      # database to the rest of the network.
+      - "127.0.0.1:5432:5432"
     volumes:
       # PostgreSQL 18+ images expect the volume at /var/lib/postgresql, not at
       # /var/lib/postgresql/data: data now lives in a version-named subdirectory so
@@ -37,12 +44,52 @@ services:
       # path makes the container refuse to start.
       - pgdata:/var/lib/postgresql
     healthcheck:
-      # The API can wait on this instead of racing a database that is still starting.
       test: ["CMD-SHELL", "pg_isready -U posuser -d posdb"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  backend:
+    build:
+      context: ./pos-backend
+    image: sethos-store-backend:latest
+    container_name: sethos-store-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      POS_DB_URL: jdbc:postgresql://postgres:5432/posdb
+      POS_DB_USERNAME: posuser
+      POS_DB_PASSWORD: ${POSTGRES_PASSWORD:-pospassword}
+      # Spring maps env vars to properties by dropping dashes, so pos.time-zone is
+      # POS_TIMEZONE (not POS_TIME_ZONE) and pos.seed-demo-data is POS_SEEDDEMODATA.
+      POS_TIMEZONE: ${POS_TIME_ZONE:-UTC}
+      POS_SEEDDEMODATA: ${POS_SEED_DEMO_DATA:-true}
+      # Browser traffic arrives same-origin via nginx, so this only matters if something
+      # calls the API directly from another origin.
+      POS_ALLOWEDORIGINS: http://localhost:${FRONTEND_PORT:-8081}
+    # Not published: reachable only through the frontend's /api proxy.
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Healthcheck is defined in the image (actuator/health).
+
+  frontend:
+    build:
+      context: ./pos-frontend
+    image: sethos-store-frontend:latest
+    container_name: sethos-store-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8080
+    ports:
+      - "${FRONTEND_PORT:-8081}:8080"
+    depends_on:
+      # Waits for the API to report healthy, so the first page load can fetch settings.
+      backend:
+        condition: service_healthy
 
   pgadmin:
     image: dpage/pgadmin4:9.18.0
@@ -54,7 +101,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     depends_on:
       postgres:
         condition: service_healthy

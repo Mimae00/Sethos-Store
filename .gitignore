@@ -8,11 +8,33 @@ pos-frontend/dist/
 pos-frontend/node_modules/
 pos-frontend/.angular/
 
-# Local H2 database files created by the default profile
+# Local H2 database files. The JDBC URL is relative (./data/posdb), so starting the
+# backend from a different working directory creates them elsewhere; match the files
+# themselves, not just the default folder. They contain real sales and customer data.
 pos-backend/data/
+*.mv.db
+*.trace.db
+*.lock.db
 
-# Local environment overrides for docker compose
+# Environment files hold passwords. Only the template is committed.
 .env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Keys and certificates, e.g. when TLS is added in front of the frontend
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Database dumps and backups
+*.sql.gz
+*.dump
+*.backup
 
 # Logs
 *.log

@@ -1,5 +1,7 @@
 # Sethos Store
 
+[![CI/CD](https://github.com/Mimae00/Sethos-Store/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Mimae00/Sethos-Store/actions/workflows/ci-cd.yml)
+
 Point of sale for Sethos Store: an Angular single-page terminal talking to a Spring Boot
 REST API over HTTP. The two halves are independent projects and can be built, run and
 deployed on their own.
@@ -23,7 +25,9 @@ development and deliberately not fine for anything shared. See
 | Java | 17 or newer | Spring Boot 4 needs 17 as a minimum |
 | Node.js | **22.22.3+ or 24.15.0+** | Angular 22's CLI refuses to run below this |
 | Maven | not needed | use the bundled `mvnw` wrapper |
-| Docker | only for PostgreSQL | the default H2 setup needs nothing |
+| Docker | for the containerised stack or PostgreSQL | the local H2 setup needs nothing |
+
+With Docker you need **only Docker**: Java and Node are inside the images.
 
 > Anything older fails immediately with "The Angular CLI requires a minimum Node.js
 > version". The `.tooling/` folder holds a portable Node used during initial setup; it is
@@ -31,7 +35,135 @@ development and deliberately not fine for anything shared. See
 
 ---
 
-## Running it
+## Running it with Docker
+
+The whole stack — PostgreSQL, backend and frontend — in one command:
+
+```bash
+docker compose up -d --build
+```
+
+Open <http://localhost:8081>. The first build takes a few minutes while Maven and npm
+download dependencies; later builds reuse the cache and take seconds.
+
+```
+browser ──▶ frontend (nginx, :8081) ──/api/*──▶ backend (:8080) ──▶ postgres (:5432)
+```
+
+- **Only the frontend is published.** nginx serves the app and reverse-proxies `/api` to the
+  backend, so the browser talks to one origin and CORS never comes into it. The backend and
+  its actuator endpoints are not reachable from the host.
+- **PostgreSQL listens on `127.0.0.1:5432` only**, so local tools can connect but the rest of
+  the network cannot.
+- **Startup is ordered by health**, not just by start: the backend waits for a healthy
+  database, the frontend for a healthy backend.
+- **Data lives in the `sethos-store_pgdata` volume** and survives `down`/`up`. The demo
+  seed runs only when the database is empty.
+
+| Command | Does |
+|---|---|
+| `docker compose up -d --build` | Build and start everything |
+| `docker compose ps` | Status and health of each container |
+| `docker compose logs -f backend` | Follow the API logs |
+| `docker compose up -d --build frontend` | Rebuild one service after a code change |
+| `docker compose --profile tools up -d` | Also start pgAdmin on <http://localhost:5050> |
+| `docker compose up -d postgres` | Database only, for running the apps locally |
+| `docker compose down` | Stop; keeps the data |
+| `docker compose down -v` | Stop **and delete the database** |
+
+### Settings
+
+Copy `.env.example` to `.env` to override the defaults; Compose reads it automatically and
+it is gitignored.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FRONTEND_PORT` | `8081` | Host port for the web app |
+| `POSTGRES_PASSWORD` | `pospassword` | Shared by the database and backend containers |
+| `POS_TIME_ZONE` | `UTC` | Defines "today" for reports and receipt numbers |
+| `POS_SEED_DEMO_DATA` | `true` | Load the demo catalogue on an empty database |
+| `PGADMIN_PASSWORD` | `admin` | pgAdmin login, `admin@sethos.local` |
+
+`POSTGRES_PASSWORD` is applied only when the volume is first created. To change it
+afterwards, change it inside PostgreSQL too, or `down -v` and start fresh.
+
+### Images
+
+| Image | Base | Size | Runs as |
+|---|---|---|---|
+| `sethos-store-backend` | `eclipse-temurin:17.0.20.1_1-jre-alpine-3.24` | ~370 MB | `sethos` |
+| `sethos-store-frontend` | `nginxinc/nginx-unprivileged:1.31.6-alpine3.24` | ~85 MB | `nginx` |
+
+Both are multi-stage: the JDK and Node toolchains stay in the build stages. The backend is
+split into Spring Boot layers so a code change rebuilds a small application layer rather
+than the full dependency set. Each image has a `HEALTHCHECK`, and base images are pinned to
+exact patches so a rebuild is reproducible.
+
+The images can be built on their own too:
+
+```bash
+docker build -t sethos-store-backend  ./pos-backend
+docker build -t sethos-store-frontend ./pos-frontend
+```
+
+The frontend proxies to `BACKEND_URL` (default `http://backend:8080`), so it can point at a
+backend running anywhere without a rebuild.
+
+---
+
+## CI/CD
+
+`.github/workflows/ci-cd.yml` tests the code and publishes both images to Docker Hub.
+
+| Event | What happens |
+|---|---|
+| Pull request to `main` | Backend tests run and both images build. **Nothing is pushed.** |
+| Push to `main` | Changed services are tested, built and pushed as `:latest` and `:sha-<commit>` |
+| Push a tag `v1.2.3` | Both images are pushed as `:1.2.3` and `:1.2` |
+| Manual run (Actions tab) | Both images are built and pushed |
+
+A service is rebuilt only when its own folder (or the workflow) changed, so a README edit
+triggers no build. The backend's tests gate its image: nothing is published from code that
+failed them. Builds use GitHub's layer cache, and each image carries an SBOM and build
+provenance.
+
+Images land at:
+
+```
+docker.io/<DOCKERHUB_USERNAME>/sethos-store-backend
+docker.io/<DOCKERHUB_USERNAME>/sethos-store-frontend
+```
+
+### One-time setup
+
+In the repository, open **Settings → Secrets and variables → Actions** and make sure these
+**repository secrets** exist with exactly these names:
+
+| Secret | Value |
+|---|---|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | A Docker Hub [access token](https://app.docker.com/settings/personal-access-tokens) with **Read & Write** scope. Not your account password. |
+
+If they are missing, the publish step fails with a message naming them. To push under a
+Docker Hub organisation instead, add a repository **variable** `DOCKERHUB_NAMESPACE`.
+
+Docker Hub creates each repository on the first push, using your account's default
+visibility. Check whether that is public or private if the images should not be public.
+
+### Releasing a version
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+`:latest` follows `main`; version tags are what you pin a deployment to.
+
+---
+
+## Running it locally (without Docker)
+
+For day-to-day development: hot reload on the frontend, and the IDE debugger on the backend.
 
 ### 1. Backend
 
@@ -97,24 +229,24 @@ the JPA mappings are portable between them.
 
 ### Switching to PostgreSQL
 
+The Docker stack uses PostgreSQL already. To run the backend locally against it instead,
+start just the database container:
+
 ```bash
-docker compose up -d                    # PostgreSQL 18.6 on :5432
-docker compose --profile tools up -d    # …plus pgAdmin on :5050
+docker compose up -d postgres           # PostgreSQL 18.6 on 127.0.0.1:5432
 
 cd pos-backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=postgres"   # Windows PowerShell
 ```
+
+This shares the same volume as the full stack, so both see the same data. Don't run the
+local backend and the backend container at the same time: two demo seeders racing on an
+empty database is not a scenario worth debugging.
 
 Credentials live in `docker-compose.yml` and `application-postgres.yml` and match by
 default (`posdb` / `posuser` / `pospassword`). Override in real environments with
 `POS_DB_URL`, `POS_DB_USERNAME`, `POS_DB_PASSWORD`.
-
-To stop, and to discard the data:
-
-```bash
-docker compose down        # keeps the volume
-docker compose down -v     # deletes the volume too
-```
 
 ---
 
@@ -337,13 +469,16 @@ Ordered by how much it will hurt to skip.
 2. **Own the schema with migrations.** `ddl-auto: update` is a development convenience and
    will not carry you through a production change safely. Move to Flyway or Liquibase and set
    `ddl-auto: validate`.
-3. **Tighten CORS and serve over HTTPS.** Replace the localhost origins in
-   `pos.allowed-origins`, or serve both halves behind one proxy and use the relative `/api`.
-4. **Back the database up.** Point-in-time recovery on PostgreSQL, and a restore you have
-   actually tested.
-5. **Tests worth the name.** There is one context-load test. The checkout money maths,
+3. **Serve over HTTPS.** The Docker stack already solves same-origin with the nginx proxy;
+   what it lacks is TLS. Put a TLS-terminating proxy or load balancer in front of the
+   frontend container rather than exposing port 8081 directly.
+4. **Real secrets.** Set `POSTGRES_PASSWORD` in `.env` or a secret manager; the compose
+   default is for local use only.
+5. **Back the database up.** Snapshot or `pg_dump` the `sethos-store_pgdata` volume, set up
+   point-in-time recovery, and test a restore.
+6. **Tests worth the name.** There is one context-load test. The checkout money maths,
    concurrent-sale stock locking, and the void/restore path are what deserve coverage first.
-6. **Turn the demo seed off.** `pos.seed-demo-data: false`.
+7. **Turn the demo seed off.** `POS_SEED_DEMO_DATA=false` in `.env`.
 
 Likely next features: refunds and partial returns (the `REFUNDED` status and the stock
 journal already anticipate them), shift and cash-drawer reconciliation, receipt printer and

@@ -1,0 +1,13 @@
+# Keep the build context small; node_modules alone is hundreds of MB and is
+# reinstalled inside the image anyway.
+node_modules/
+dist/
+.angular/
+.vscode/
+*.log
+.git/
+.gitignore
+.editorconfig
+Dockerfile
+.dockerignore
+README.md

@@ -1,0 +1,13 @@
+# Keep the build context small and free of local state.
+target/
+data/
+*.log
+.idea/
+.vscode/
+*.iml
+HELP.md
+.git/
+.gitignore
+.gitattributes
+Dockerfile
+.dockerignore
